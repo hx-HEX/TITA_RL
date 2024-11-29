@@ -4,19 +4,19 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 class TitaCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
         num_envs = 4096
-        num_observations = 36#36+121
+        num_observations = 33#36+121
         num_actions = 8
-        num_privileged_obs = (36 + 30 + 4)  # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise
+        num_privileged_obs = (33 + 3 + 30 + 6)  # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise
         env_spacing = 3.0  # not used with heightfields/trimeshes
         send_timeouts = True  # send time out information to the algorithm
-        episode_length_s = 10  # episode length in seconds
+        episode_length_s = 20  # episode length in seconds
         delay_termination_time_s = 1.0
 
     class terrain(LeggedRobotCfg.terrain):
-        mesh_type = "trimesh"
+        mesh_type = "trimesh"#trimesh,plane
         static_friction = 1.0
         dynamic_friction = 1.0
-        restitution = 0.
+        restitution = 0.0
         measure_heights = True
         selected = False  # select a unique terrain type and pass all arguments
         terrain_kwargs = None  # Dict of arguments for selected terrain
@@ -33,21 +33,23 @@ class TitaCfg(LeggedRobotCfg):
         ]  # 1mx1m rectangle (without center line)
         measured_points_y = [ -0.2, -0.1, 0.0, 0.1, 0.2]
         # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete]
-        terrain_proportions = [0.1, 0.3, 0.3, 0.3, 0.0, 0.0]
+        terrain_proportions = [0.0, 0.1, 0.45, 0.45, 0.0, 0.0]
 
     class commands(LeggedRobotCfg.commands):
         curriculum = True
         max_curriculum = 2.0
         num_commands = 4  # default: lin_vel_x, ang_vel_yaw, heading, height
-        resampling_time = 20  # time before command are changed[s] default:2
+        resampling_time = 10  # time before command are changed[s] default:2
         heading_command = True  # if true: compute ang vel command from heading error
         threshold = 0.5  # 控制技能学习采样频率
+        feedforward_wheel = 1.0
 
         class ranges(LeggedRobotCfg.commands.ranges):
-            lin_vel_x = [-2.0, 3.0]  
+            lin_vel_x = [-2.0, 4.0]  
             ang_vel_yaw = [-5.0, 5.0]
+            height = [0.2,0.4] 
             heading = [-3.14, 3.14]
-            height = [0.2,0.4]  
+             
 
     class init_state(LeggedRobotCfg.init_state):
         pos = [0.0, 0.0, 0.4]  # x,y,z [m]
@@ -57,11 +59,11 @@ class TitaCfg(LeggedRobotCfg):
         # todo设置关节初始位置 以及 PD参数
         # 参考传统控制
         default_joint_angles = {  # = target angles [rad] when action = 0.0
-            "joint_left_hip":  0.,
+            "joint_left_hip":  -0.00,
             "joint_left_thigh": 0.858,
             "joint_left_calf": -1.755,
             "joint_left_wheel": 0.0,
-            "joint_right_hip": 0.,
+            "joint_right_hip": 0.00,
             "joint_right_thigh": -0.858,
             "joint_right_calf": 1.755,
             "joint_right_wheel": 0.0,
@@ -70,7 +72,7 @@ class TitaCfg(LeggedRobotCfg):
             # "joint_left_calf": 0.0,
             # "joint_left_wheel": 0.0,
             # "joint_right_hip": 0.,
-            # "joint_right_thigh": -0.0,
+            # "joint_right_thigh": 0.,
             # "joint_right_calf": 0.0,
             # "joint_right_wheel": 0.0,
         }
@@ -125,7 +127,7 @@ class TitaCfg(LeggedRobotCfg):
             dof_acc = -2.5e-7  # 惩罚关节加速度
             base_height = 2.0  # 惩罚基座高度偏离目标高度
             feet_air_time = 0.0  # 奖励长时间的步伐
-            collision = -10.0  # 惩罚选定身体部位的碰撞
+            collision = -1.0  # 惩罚选定身体部位的碰撞
             action_rate = -0.001 # 惩罚动作的快速变化 | 影响收敛
             feet_stumble = -0.0  # 惩罚脚部撞击垂直表面
             stand_still = -0.0  # 在没有运动命令时惩罚机器人的运动
@@ -133,10 +135,10 @@ class TitaCfg(LeggedRobotCfg):
             dof_pos_limits = -1.0  # 惩罚关节位置过度运动接近极限
             dof_vel_limits = 0.0  # 惩罚关节速度过大接近极限
             torque_limits = 0.0  # 惩罚关节力矩过大接近极限
-            no_moonwalk = -1.0  # 惩罚“太空步”即轮子一前一后
+            no_moonwalk = -5.0  # 惩罚“太空步”即轮子一前一后
             no_fly = 2.0  # 奖励轮子贴合地面
-            knee_angle = 0.0
-            hip_angle = 1.0
+            action_smooth = -0.001
+            hip_angle = -1.0
 
 
     
