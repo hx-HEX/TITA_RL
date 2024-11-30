@@ -59,11 +59,11 @@ class TitaCfg(LeggedRobotCfg):
         # todo设置关节初始位置 以及 PD参数
         # 参考传统控制
         default_joint_angles = {  # = target angles [rad] when action = 0.0
-            "joint_left_hip":  -0.00,
+            "joint_left_hip":  -0.20,
             "joint_left_thigh": 0.858,
             "joint_left_calf": -1.755,
             "joint_left_wheel": 0.0,
-            "joint_right_hip": 0.00,
+            "joint_right_hip": 0.20,
             "joint_right_thigh": -0.858,
             "joint_right_calf": 1.755,
             "joint_right_wheel": 0.0,
@@ -79,8 +79,8 @@ class TitaCfg(LeggedRobotCfg):
 
     class control(LeggedRobotCfg.control):
         # PD Drive parameters:
-        stiffness = {"joint": 180.0}  # [N*m/rad]
-        damping = {"joint": 10.0}  # [N*m*s/rad]
+        stiffness = {"joint": 40.0}  # [N*m/rad]
+        damping = {"joint": 1.0}  # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.5
         # decimation: Number of control action updates @ sim DT per policy DT
