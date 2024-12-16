@@ -63,6 +63,41 @@ class Tita(LeggedRobot):
         self.still_flag = (torch.abs(self.commands[:,0]) < 0.1) & (torch.abs(self.commands[:,1]) < 0.1)
 
 
+    def _process_dof_props(self, props, env_id):
+        """ Callback allowing to store/change/randomize the DOF properties of each environment.
+            Called During environment creation.
+            Base behavior: stores position, velocity and torques limits defined in the URDF
+
+        Args:
+            props (numpy.array): Properties of each DOF of the asset
+            env_id (int): Environment id
+
+        Returns:
+            [numpy.array]: Modified DOF properties
+        """
+        if env_id==0:
+            self.dof_pos_limits = torch.zeros(self.num_dof, 2, dtype=torch.float, device=self.device, requires_grad=False)
+            self.dof_vel_limits = torch.zeros(self.num_dof, dtype=torch.float, device=self.device, requires_grad=False)
+            self.torque_limits = torch.zeros(self.num_dof, dtype=torch.float, device=self.device, requires_grad=False)
+            for i in range(len(props)):
+                self.dof_pos_limits[i, 0] = props["lower"][i].item()
+                self.dof_pos_limits[i, 1] = props["upper"][i].item()
+                if i == 0 or i == 4:
+                    self.dof_pos_limits[i, 0] = props["lower"][i].item()*0.5
+                    self.dof_pos_limits[i, 1] = props["upper"][i].item()*0.5
+                # if i == 1: 
+                #     self.dof_pos_limits[i, 0] = props["lower"][i].item()*0.6
+                # if i == 5:
+                #     self.dof_pos_limits[i, 1] = props["upper"][i].item()*0.6
+                self.dof_vel_limits[i] = props["velocity"][i].item()
+                self.torque_limits[i] = props["effort"][i].item()
+                # soft limits
+                m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
+                r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
+                self.dof_pos_limits[i, 0] = m - 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
+                self.dof_pos_limits[i, 1] = m + 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
+        return props
+
     def _resample_commands(self, env_ids):
         """ Randommly select commands of some environments
         Args:
@@ -255,6 +290,20 @@ class Tita(LeggedRobot):
         return torch.exp(-height_err / self.cfg.rewards.tracking_sigma)
         # return height_err
 
+    def _reward_dof_pos_limits(self):
+        # Penalize dof positions too close to the limit
+        out_of_limits_1 = -(self.dof_pos[:,:3] - self.dof_pos_limits[:3, 0]).clip(max=0.)
+        out_of_limits_2 = -(self.dof_pos[:,4:7] - self.dof_pos_limits[4:7, 0]).clip(max=0.)# lower limit
+
+        out_of_limits_1 += (self.dof_pos[:,:3] - self.dof_pos_limits[:3, 1]).clip(min=0.)
+        out_of_limits_2 += (self.dof_pos[:,4:7] - self.dof_pos_limits[4:7, 1]).clip(min=0.)
+
+        out_of_limits = torch.cat((
+                                    out_of_limits_1,
+                                    out_of_limits_2
+                                ),dim = -1)
+        return torch.sum(out_of_limits, dim=1)
+
     def _reward_no_moonwalk(self):
         x = self.base_quat[:, 0]
         y = self.base_quat[:, 1]
@@ -288,7 +337,7 @@ class Tita(LeggedRobot):
 
         l = torch.torch.sin(theta_thigh2vertical_left+self.theta_left)-len_ratio*torch.torch.sin(theta_thigh2vertical_left)
         r = -(torch.torch.sin(theta_thigh2vertical_right+self.theta_right)-len_ratio*torch.torch.sin(theta_thigh2vertical_right))
-        
+
         rew = torch.square(r + l)
         return rew
 
@@ -354,5 +403,4 @@ class Tita(LeggedRobot):
         print("true_ratio=",true_ratio )
         print("self.commands[:,0]",self.commands[:,0])
         print("self.commands[:,1]",self.commands[:,1])
-        print("self.base_vel",self.base_lin_vel[:,0])
         

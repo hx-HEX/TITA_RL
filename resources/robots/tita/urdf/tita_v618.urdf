@@ -254,8 +254,9 @@
         xyz="0 0 0"
         rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/left_wheel.STL" />
+        <!-- <mesh
+          filename="../meshes/left_wheel.STL" /> -->
+        <cylinder radius="0.0925" length="0.034" />
       </geometry>
     </collision>
   </link>
@@ -272,6 +273,8 @@
     <axis
       xyz="0 0 1" />
     <limit
+      lower="-6.283185e4" 
+      upper="6.283185e4"
       effort="10"
       velocity="104.88" />
   </joint>
@@ -484,8 +487,9 @@
         xyz="0 0 0"
         rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/right_wheel.STL" />
+        <!-- <mesh
+          filename="../meshes/right_wheel.STL" /> -->
+        <cylinder radius="0.0925" length="0.034" />
       </geometry>
     </collision>
   </link>
@@ -502,6 +506,8 @@
     <axis
       xyz="0 0 -1" />
     <limit
+      lower="-6.283185e4" 
+      upper="6.283185e4"
       effort="10"
       velocity="104.88" />
   </joint>
