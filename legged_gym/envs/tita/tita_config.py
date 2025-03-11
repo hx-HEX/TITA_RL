@@ -33,7 +33,7 @@ class TitaCfg(LeggedRobotCfg):
         ]  # 1mx1m rectangle (without center line)
         measured_points_y = [ -0.2, -0.1, 0.0, 0.1, 0.2]
         # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete]
-        terrain_proportions = [0.0, 0.1, 0.45, 0.45, 0.0, 0.0]
+        terrain_proportions = [0.0, 0.1, 0.4, 0.4, 0.05, 0.05]
 
     class commands(LeggedRobotCfg.commands):
         curriculum = True
@@ -59,27 +59,27 @@ class TitaCfg(LeggedRobotCfg):
         # todo设置关节初始位置 以及 PD参数
         # 参考传统控制
         default_joint_angles = {  # = target angles [rad] when action = 0.0
-            "joint_left_hip":  -0.00,
-            "joint_left_thigh": 1.3,
-            "joint_left_calf": -2.6,
-            "joint_left_wheel": 0.0,
-            "joint_right_hip": 0.0,
-            "joint_right_thigh": -1.3,
-            "joint_right_calf": 2.6,
-            "joint_right_wheel": 0.00,
-            # "joint_left_hip":  0.,
-            # "joint_left_thigh": 0.,
-            # "joint_left_calf": 0.0,
+            # "joint_left_hip":  -0.00,
+            # "joint_left_thigh": 1.3,
+            # "joint_left_calf": -2.6,
             # "joint_left_wheel": 0.0,
-            # "joint_right_hip": 0.,
-            # "joint_right_thigh": 0.,
-            # "joint_right_calf": 0.0,
-            # "joint_right_wheel": 0.0,
+            # "joint_right_hip": 0.0,
+            # "joint_right_thigh": -1.3,
+            # "joint_right_calf": 2.6,
+            # "joint_right_wheel": 0.00,
+            "joint_left_hip":  0.,
+            "joint_left_thigh": 0.858,
+            "joint_left_calf": -1.755,
+            "joint_left_wheel": 0.0,
+            "joint_right_hip": 0.,
+            "joint_right_thigh": -0.858,
+            "joint_right_calf": 1.755,
+            "joint_right_wheel": 0.0,
         }
 
     class control(LeggedRobotCfg.control):
         # PD Drive parameters:
-        stiffness = {"joint": 60.0}  # [N*m/rad]
+        stiffness = {"joint": 80.0}  # [N*m/rad]
         damping = {"joint": 1.0}  # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.5
@@ -91,7 +91,7 @@ class TitaCfg(LeggedRobotCfg):
         name = "tita"
         foot_name = "wheel"
         penalize_contacts_on = ["thigh", "calf"]
-        terminate_after_contacts_on = ["base"]#  ["base","calf"] # 防止跪刹
+        terminate_after_contacts_on = ["base"]#["base"]
         flip_visual_attachments = False
         self_collisions = 1  # 1 to disable, 0 to enable...bitwise filter
 
@@ -102,7 +102,7 @@ class TitaCfg(LeggedRobotCfg):
         added_mass_range = [-1.0, 1.0]
         push_robots = True
         push_interval_s = 15
-        max_push_vel_xy = 1.0  # default: 1.
+        max_push_vel_xy = 0.0  # default: 1.
 
     class rewards(LeggedRobotCfg.rewards):
         soft_dof_pos_limit = 0.90
@@ -116,19 +116,19 @@ class TitaCfg(LeggedRobotCfg):
         class scales(LeggedRobotCfg.rewards.scales):
             termination = 0.0  # 惩罚因为非时间耗尽条件而终止的情况
             tracking_lin_vel = 5.0  # 奖励线性速度命令的跟踪（仅x和y轴）
-            tracking_ang_vel = 1.0  # 奖励角速度命令的跟踪（仅偏航轴）
+            tracking_ang_vel = 2.0  # 奖励角速度命令的跟踪（仅偏航轴）
             lin_vel_z = -0.2  # 惩罚z轴上的基座线速度 | 也可以用来奖励跳跃
-            ang_vel_xy = -0.5  # 惩罚xy轴上的基座角速度
+            ang_vel_xy = -0.05  # 惩罚xy轴上的基座角速度
             orientation = (
                 -10.0
             )  # 惩罚非水平的基座姿态（xy轴方向上的重力分量）default: -1.5
             torques = -0.00001  # 惩罚力矩的使用
             dof_vel = -5e-5  # 惩罚关节速度
             dof_acc = -2.5e-7  # 惩罚关节加速度
-            base_height = 1.0  # 惩罚基座高度偏离目标高度
+            base_height = 2.0  # 惩罚基座高度偏离目标高度
             feet_air_time = 0.0  # 奖励长时间的步伐
-            collision = -1.0  # 惩罚选定身体部位的碰撞
-            action_rate = -0.001 # 惩罚动作的快速变化 | 影响收敛
+            collision = -10.0  # 惩罚选定身体部位的碰撞
+            action_rate = -0.001 # 惩罚动作的快速变化 | 影响收敛,-0.001
             feet_stumble = -0.0  # 惩罚脚部撞击垂直表面
             stand_still = -0.0  # 在没有运动命令时惩罚机器人的运动
             feet_contact_forces = 0.0  # 惩罚足部接触力过大 | 现实是否可以获取
@@ -136,12 +136,10 @@ class TitaCfg(LeggedRobotCfg):
             dof_vel_limits = 0.0  # 惩罚关节速度过大接近极限
             torque_limits = 0.0  # 惩罚关节力矩过大接近极限
             no_moonwalk = -5.0  # 惩罚“太空步”即轮子一前一后
-            no_fly = 10.0  # 奖励轮子贴合地面
+            no_fly = 2.0  # 奖励轮子贴合地面
             action_smooth = -0.001
             hip_angle = -0.01
 
-
-    
     class normalization:
         class obs_scales:
             lin_vel = 2.0
@@ -230,6 +228,7 @@ class TitaCfgPPO(LeggedRobotCfgPPO):
         run_name = ""
         # load and resume
         resume =  True
-        load_run = -1 #  "33_obs_trimesh_40_1" last run
-        checkpoint = -1  # 5000 = last saved model
+        load_run =  "Mar10_16-23-21_"#"33_obs_trimesh_40_1" #last run
+        checkpoint = -1 # last saved model
         resume_path = None  # updated from load_run and chkpt
+ 

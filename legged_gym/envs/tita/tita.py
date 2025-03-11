@@ -16,34 +16,31 @@ class Tita(LeggedRobot):
     def _compute_torques(self, actions):
         
         actions_scaled = actions * self.cfg.control.action_scale
-        dof_pos_ref_left = actions[:,:3]* self.cfg.control.action_scale
-        dof_vel_ref_left = actions[:,3]* self.cfg.control.action_scale*20
-        dof_pos_ref_right = actions[:,4:7]* self.cfg.control.action_scale
-        dof_vel_ref_right = actions[:,7]* self.cfg.control.action_scale*20
+        # dof_pos_ref_left = actions[:,:3]* self.cfg.control.action_scale
+        # dof_vel_ref_left = actions[:,3]* self.cfg.control.action_scale*20
+        # dof_pos_ref_right = actions[:,4:7]* self.cfg.control.action_scale
+        # dof_vel_ref_right = actions[:,7]* self.cfg.control.action_scale*20
 
         torques_pos = self.p_gains*(actions_scaled + self.default_dof_pos - self.dof_pos) - self.d_gains*self.dof_vel
-        torques_left_pos = torques_pos[:,:3]
-        torques_right_pos = torques_pos[:,4:7]
-        dof_vel_gain = self.d_gains[0]
-        dof_vel_gain.repeat(self.num_envs)
+        # torques_pos = self.p_gains*(actions_scaled + self.default_dof_pos - self.dof_pos_accumulated) - self.d_gains*self.dof_vel
+        # torques_left_pos = torques_pos[:,:3]
+        # torques_right_pos = torques_pos[:,4:7]
+        # dof_vel_gain = self.d_gains[0]
+        # dof_vel_gain.repeat(self.num_envs)
 
-        target_vel = self.commands[:, 0]
-        target_w = self.commands[:, 1]
-        left_wheel_vel_target = target_vel/0.09 - target_w
-        right_wheel_vel_target = -target_vel/0.09 - target_w
-        torques_left_vel = dof_vel_gain*(dof_vel_ref_left   - self.dof_vel[:,3]) 
-        torques_right_vel = dof_vel_gain*(dof_vel_ref_right  - self.dof_vel[:,7]) 
+        # torques_left_vel = dof_vel_gain*(dof_vel_ref_left   - self.dof_vel[:,3]) 
+        # torques_right_vel = dof_vel_gain*(dof_vel_ref_right  - self.dof_vel[:,7]) 
 
-        torques = torch.cat(
-            (
-                torques_left_pos,
-                torques_left_vel.unsqueeze(1),
-                torques_right_pos,
-                torques_right_vel.unsqueeze(1)
-            ),
-            axis = 1,
-                            )
-        return torch.clip(torques, -self.torque_limits, self.torque_limits)
+        # torques = torch.cat(
+        #     (
+        #         torques_left_pos,
+        #         torques_left_vel.unsqueeze(1),
+        #         torques_right_pos,
+        #         torques_right_vel.unsqueeze(1)
+        #     ),
+        #     axis = 1,
+        #                     )
+        return torch.clip(torques_pos, -self.torque_limits, self.torque_limits)
 
     def _post_physics_step_callback(self):
         """ Callback called before computing terminations, rewards, and observations
@@ -96,6 +93,8 @@ class Tita(LeggedRobot):
                 r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
                 self.dof_pos_limits[i, 0] = m - 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
                 self.dof_pos_limits[i, 1] = m + 0.5 * r * self.cfg.rewards.soft_dof_pos_limit
+            print("wheel_limit_up",self.dof_pos_limits[3, 1])
+            print("wheel_limit_down",self.dof_pos_limits[3, 0])
         return props
 
     def _resample_commands(self, env_ids):
@@ -121,15 +120,25 @@ class Tita(LeggedRobot):
         self.time_out_buf = self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
         self.reset_buf |= self.time_out_buf
 
+    # 解除关节角度的周期性限制
+    def unwrap_dof_pos(self):
+        delta_theta = self.dof_pos - self.prev_dof_pos
+        delta_theta += (delta_theta < -2 * torch.pi) * (4 * torch.pi)  # 负方向修正
+        delta_theta -= (delta_theta > 2 * torch.pi) * (4 * torch.pi)   # 正方向修正
+        return self.dof_pos_accumulated + delta_theta
+
     def compute_observations(self):
         """ Computes observations
         """
+        self.dof_pos_accumulated = self.unwrap_dof_pos()
+
         #torch.cat 将多个张量沿最后一个维度拼接在一起，乘以观测尺度是为了确保观测数据在处理和学习中的有效性和一致性，从而提高整体性能
         self.obs_buf = torch.cat((  #self.base_lin_vel * self.obs_scales.lin_vel,
                                     self.base_ang_vel  * self.obs_scales.ang_vel,
                                     self.projected_gravity,
                                     self.commands[:, :3] * self.commands_scale,
                                     (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
+                                    # (self.dof_pos_accumulated - self.default_dof_pos) * self.obs_scales.dof_pos,
                                     self.dof_vel * self.obs_scales.dof_vel,
                                     self.actions
                                     ),dim=-1)
@@ -146,12 +155,15 @@ class Tita(LeggedRobot):
                 ),
                 dim=-1,
             )
-            
+        # print("wheel_position",self.dof_pos[0,3])
+        # print("wheel_position_accum",self.dof_pos_accumulated[0,3])
         # add noise if needed
         if self.add_noise:
             #torch.rand_like(self.obs_buf)：这个函数生成一个与 self.obs_buf 形状相同的张量，其中的值都是在 [0, 1) 范围内均匀分布的随机数
             #2 * torch.rand_like(self.obs_buf) - 1：通过将生成的随机数乘以 2，然后减去 1，将随机数的范围转换为 [-1, 1)
             self.obs_buf += (2 * torch.rand_like(self.obs_buf) - 1) * self.noise_scale_vec
+        # 更新 prev_dof_pos
+        self.prev_dof_pos = self.dof_pos.clone()
     
     def _get_noise_scale_vec(self, cfg):
         """ Sets a vector used to scale the noise added to the observations.
@@ -191,7 +203,15 @@ class Tita(LeggedRobot):
         self.still_gain[:,4] = 1
         self.last_actions = torch.zeros(self.num_envs,self.num_actions,2,dtype=torch.float,device=self.device,requires_grad=False)
         self.is_step = torch.zeros(self.num_envs,1,dtype=torch.bool,device=self.device,requires_grad=False)
+        self.commands_scale = torch.tensor([self.obs_scales.lin_vel, self.obs_scales.ang_vel, self.obs_scales.height_measurements], device=self.device, requires_grad=False,) # TODO change this
+        self.prev_dof_pos = self.dof_pos.clone()
+        self.dof_pos_accumulated = self.dof_pos.clone()
     
+    def _reset_dofs(self, env_ids):
+        super()._reset_dofs(env_ids)
+        self.prev_dof_pos[env_ids] = self.dof_pos[env_ids].clone()
+        self.dof_pos_accumulated[env_ids] = self.dof_pos[env_ids].clone()
+
     def reset_idx(self, env_ids):
         super().reset_idx(env_ids)
         self.delay_termination_buf[env_ids] = 0.
@@ -248,7 +268,9 @@ class Tita(LeggedRobot):
     
     def _reward_action_rate(self):
         # Penalize changes in actions
-        return torch.sum(torch.square(self.last_actions[:,:,0] - self.actions), dim=1)
+        # return torch.sum(torch.square(self.last_actions[:,:,0] - self.actions), dim=1)
+        return (torch.sum(torch.square(self.last_actions[:,:3,0] - self.actions[:, :3]), dim=1)+
+                torch.sum(torch.square(self.last_actions[:,4:7,0] - self.actions[:, 4:7]), dim=1))
 
     def _reward_action_smooth(self):
         # Penalize changes in actions
@@ -280,6 +302,7 @@ class Tita(LeggedRobot):
         # rew = (-1.0*(torch.sum(1.0 * contacts_z, dim=1) == 2)*output   
         #     + 2.0*(torch.sum(1.0 * contacts_z, dim=1) > 0)
         #     + 1.0*(torch.sum(1.0 * contacts_z, dim=1) == 1)*output)
+        # rew = 1.0*(torch.sum(1.0 * contacts_z, dim=1) > 0)
         rew = 1.0*(torch.sum(1.0 * contacts_z, dim=1) > 0)
         return rew
 

@@ -74,8 +74,15 @@ def play(args):
     camera_direction = np.array(env_cfg.viewer.lookat) - np.array(env_cfg.viewer.pos)
     img_idx = 0
 
+    model_path = "/home/hx/IsaacGym_Preview_4_Package/isaacgym/legged_gym/logs/tita/exported/policies/policy_1.pt"
+    model = torch.jit.load(model_path)
+    model.to(env.device)
+    
     for i in range(10*int(env.max_episode_length)):
-        actions = policy(obs.detach())
+        actions = model.forward(obs.detach())
+        print("Value at (0,28):", obs[0, 12].item())
+
+        # actions = policy(obs.detach())
         obs, _, rews, dones, infos = env.step(actions.detach())
         if RECORD_FRAMES:
             if i % 2:
